@@ -1,12 +1,18 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	botApi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/joho/godotenv"
 )
+
+type healthResponse struct {
+	Status string `json:"status"`
+}
 
 func main() {
 	err := godotenv.Load()
@@ -15,6 +21,12 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
+	startBot()
+
+	startHealth()
+}
+
+func startBot() {
 	telegramToken := os.Getenv("TELEGRAM_SECRET_TOKEN")
 
 	bot, err := botApi.NewBotAPI(telegramToken)
@@ -43,4 +55,18 @@ func main() {
 
 		bot.Send(msg)
 	}
+}
+
+func startHealth() {
+	port := os.Getenv("PORT")
+
+	fmt.Printf("started server at :%s", port)
+
+	http.HandleFunc("/health", handler)
+	http.ListenAndServe(":"+port, nil)
+}
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	fmt.Printf("teste")
+	fmt.Fprintf(w, "Hi there, I love %s!", r.URL.Path[1:])
 }
