@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/RafaelPereiraSantos/telegram-go-bot/internal/adapter/in"
 	"github.com/RafaelPereiraSantos/telegram-go-bot/internal/api"
 	"github.com/RafaelPereiraSantos/telegram-go-bot/internal/application/service"
+	"github.com/RafaelPereiraSantos/telegram-go-bot/internal/bot"
 )
 
 type healthResponse struct {
@@ -22,41 +24,22 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	// startBot()
+	go startBot()
 
 	startHealth()
 }
 
-// func startBot() {
-// 	telegramToken := os.Getenv("TELEGRAM_SECRET_TOKEN")
+func startBot() {
+	b, err := bot.NewTelegramBot(os.Getenv("TELEGRAM_SECRET_TOKEN"))
 
-// 	bot, err := botApi.NewBotAPI(telegramToken)
-// 	if err != nil {
-// 		log.Panic(err)
-// 	}
+	if err != nil {
+		msg := fmt.Sprintf("Unable to start bot %s", err.Error())
+		fmt.Println(msg)
+		return
+	}
 
-// 	bot.Debug = true
-
-// 	log.Printf("Authorized on account %s", bot.Self.UserName)
-
-// 	u := botApi.NewUpdate(0)
-// 	u.Timeout = 60
-
-// 	updates, err := bot.GetUpdatesChan(u)
-
-// 	for update := range updates {
-// 		if update.Message == nil {
-// 			continue
-// 		}
-
-// 		log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
-
-// 		msg := botApi.NewMessage(update.Message.Chat.ID, update.Message.Text)
-// 		msg.ReplyToMessageID = update.Message.MessageID
-
-// 		bot.Send(msg)
-// 	}
-// }
+	b.ListenEvents(true)
+}
 
 func startHealth() {
 	healthService := service.NewCheckServicesHealth()
