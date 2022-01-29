@@ -33,7 +33,6 @@ func startBot() {
 	botServiceAdp := in.NewBotImpl(botService)
 
 	b, err := bot.NewTelegramBot(os.Getenv("TELEGRAM_SECRET_TOKEN"), botServiceAdp)
-
 	if err != nil {
 		msg := fmt.Sprintf("Unable to start bot %s", err.Error())
 		fmt.Println(msg)
