@@ -3,14 +3,16 @@ package bot
 import (
 	"log"
 
+	"github.com/RafaelPereiraSantos/telegram-go-bot/internal/adapter/in"
 	telegramBot "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 type TelegramBot struct {
-	bot *telegramBot.BotAPI
+	bot           *telegramBot.BotAPI
+	messageSevice in.BotAdp
 }
 
-func NewTelegramBot(telegramToken string) (*TelegramBot, error) {
+func NewTelegramBot(telegramToken string, messageSevice in.BotAdp) (*TelegramBot, error) {
 	bot, err := telegramBot.NewBotAPI(telegramToken)
 
 	if err != nil {
@@ -18,7 +20,8 @@ func NewTelegramBot(telegramToken string) (*TelegramBot, error) {
 	}
 
 	return &TelegramBot{
-		bot: bot,
+		bot:           bot,
+		messageSevice: messageSevice,
 	}, nil
 }
 
@@ -26,6 +29,8 @@ func (tBot *TelegramBot) ListenEvents(debug bool) error {
 
 	bot := tBot.bot
 	bot.Debug = debug
+
+	srv := tBot.messageSevice
 
 	updateConfig := telegramBot.NewUpdate(0)
 	updateConfig.Timeout = 60
@@ -39,8 +44,11 @@ func (tBot *TelegramBot) ListenEvents(debug bool) error {
 
 		log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
 
-		msg := telegramBot.NewMessage(update.Message.Chat.ID, update.Message.Text)
-		msg.ReplyToMessageID = update.Message.MessageID
+		receivedMessage := update.Message
+		replyText := srv.ReceiveMessage(receivedMessage.From.UserName, receivedMessage.Text)
+
+		msg := telegramBot.NewMessage(update.Message.Chat.ID, replyText)
+		// msg.ReplyToMessageID = update.Message.MessageID
 
 		bot.Send(msg)
 	}
