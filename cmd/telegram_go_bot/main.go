@@ -7,9 +7,11 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/RafaelPereiraSantos/telegram-go-bot/internal/adapter/in"
+	apiOut "github.com/RafaelPereiraSantos/telegram-go-bot/internal/adapter/out/api"
 	"github.com/RafaelPereiraSantos/telegram-go-bot/internal/api"
 	"github.com/RafaelPereiraSantos/telegram-go-bot/internal/application/service"
 	"github.com/RafaelPereiraSantos/telegram-go-bot/internal/bot"
+	extService "github.com/RafaelPereiraSantos/telegram-go-bot/internal/service"
 )
 
 type healthResponse struct {
@@ -29,7 +31,19 @@ func main() {
 }
 
 func startBot() {
-	botService := service.NewBot()
+	user := extService.RedditUser{
+		UserName: os.Getenv("REDDIT_USER_NAME"),
+		Password: os.Getenv("REDDIT_USER_PASSWORD"),
+	}
+
+	reddit := extService.NewRedditIntegration(
+		os.Getenv("REDDIT_APP_ID"),
+		os.Getenv("REDDIT_APP_TOKEN"),
+		user,
+	)
+	redditAdp := apiOut.NewReddtAdp(reddit)
+
+	botService := service.NewBot(redditAdp)
 	botServiceAdp := in.NewBotImpl(botService)
 
 	b, err := bot.NewTelegramBot(os.Getenv("TELEGRAM_SECRET_TOKEN"), botServiceAdp)

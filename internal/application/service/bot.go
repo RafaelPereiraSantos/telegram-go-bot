@@ -4,12 +4,17 @@ import (
 	"fmt"
 
 	"github.com/RafaelPereiraSantos/telegram-go-bot/internal/application/model"
+	"github.com/RafaelPereiraSantos/telegram-go-bot/internal/application/port/out/api"
 )
 
-type Bot struct{}
+type Bot struct {
+	scraper api.SocialMediaScraper
+}
 
-func NewBot() *Bot {
-	return &Bot{}
+func NewBot(scraper api.SocialMediaScraper) *Bot {
+	return &Bot{
+		scraper: scraper,
+	}
 }
 
 func (bot *Bot) ReceiveMessage(message model.Message) string {
