@@ -3,25 +3,19 @@ package service
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 
-	"github.com/RafaelPereiraSantos/telegram-go-bot/internal/application/model"
+	"telegram-go-bot/internal/application/model"
 )
 
 type (
 	RedditIntegration struct {
-		appId       string
-		appToken    string
-		user        RedditUser
-		accessToken *model.AccessToken
-	}
-
-	RedditUser struct {
-		UserName string
-		Password string
+		appId    string
+		appToken string
 	}
 )
 
@@ -35,25 +29,75 @@ const (
 	contentType         = "application/json"
 )
 
-func NewRedditIntegration(appId, appToken string, user RedditUser) *RedditIntegration {
+var (
+	ErrTokenExpired = errors.New("Invalid authorization token")
+)
+
+func NewRedditIntegration(appId, appToken string) *RedditIntegration {
 	return &RedditIntegration{
 		appId:    appId,
 		appToken: appToken,
-		user:     user,
+		// accessToken: &model.AccessToken{
+		// 	Value:       "1502749964836-vucSBSsKxp65o669f4A3vEic-3WiPg",
+		// 	ExpiresIn:   3600,
+		// 	RequestedAt: 1643668961,
+		// },
 	}
 }
 
-func (integration *RedditIntegration) FollowedPages() (*model.SubscriptionsResponse, error) {
-	if !integration.isAccessTokenValid() {
-		err := integration.updateAccessToken()
+func (integration *RedditIntegration) RequestAccessToken(user, pass string) (*model.AccessToken, error) {
+	fmt.Println("Requesting access token")
 
-		if err != nil {
-			fmt.Println(err.Error())
-			return nil, err
-		}
+	client := &http.Client{}
+
+	req, err := integration.buildOauth2Request(user, pass)
+
+	if err != nil {
+		fmt.Println(err.Error())
+		return nil, err
 	}
 
-	req, err := integration.buildGetWithHeaders(redditOauthHost + mySubscriptionsPath)
+	resp, err := client.Do(req)
+
+	if err != nil {
+		fmt.Println(err.Error())
+		return nil, err
+	}
+
+	rawBody := resp.Body
+
+	defer rawBody.Close()
+
+	body, err := io.ReadAll(rawBody)
+
+	if err != nil {
+		fmt.Println(err.Error())
+		return nil, err
+	}
+
+	var tokenResp model.AccessTokenResponse
+
+	err = json.Unmarshal(body, &tokenResp)
+
+	if err != nil {
+		fmt.Println(err.Error())
+		return nil, err
+	}
+
+	return &model.AccessToken{
+		Value:       tokenResp.AccessToken,
+		ExpiresIn:   tokenResp.ExpiresIn,
+		RequestedAt: time.Now().Unix(),
+	}, nil
+}
+
+func (integration *RedditIntegration) FollowedPages(user string, accessToken model.AccessToken) (*model.SubscriptionsResponse, error) {
+	if !isAccessTokenValid(accessToken) {
+		return nil, ErrTokenExpired
+	}
+
+	url := redditOauthHost + mySubscriptionsPath
+	req, err := buildGetWithHeaders(url, user, integration.appId, accessToken.Value)
 
 	if err != nil {
 		fmt.Println(err.Error())
@@ -93,103 +137,17 @@ func (integration *RedditIntegration) FollowedPages() (*model.SubscriptionsRespo
 	return &subResp, nil
 }
 
-func (integration *RedditIntegration) isAccessTokenValid() bool {
-	accessToken := integration.accessToken
-
-	if accessToken == nil {
-		return false
-	}
-
-	expireAt := accessToken.ExpiresIn + accessToken.RequestedAt
+func isAccessTokenValid(token model.AccessToken) bool {
+	expireAt := token.ExpiresIn + token.RequestedAt
 	currentTime := time.Now().UnixMicro()
 
 	return currentTime < expireAt
 }
 
-func (integration *RedditIntegration) updateAccessToken() error {
-	resp, err := integration.RequestAccessToken()
-
-	if err != nil {
-		fmt.Println(err.Error())
-		return err
-	}
-
-	integration.accessToken = &model.AccessToken{
-		Value:       resp.AccessToken,
-		ExpiresIn:   resp.ExpiresIn,
-		RequestedAt: time.Now().UnixMicro(),
-	}
-
-	return nil
-}
-
-func (integration *RedditIntegration) RequestAccessToken() (*model.AccessTokenResponse, error) {
-	fmt.Println("Requesting access token")
-
-	client := &http.Client{}
-
-	req, err := integration.buildOauth2Request()
-
-	if err != nil {
-		fmt.Println(err.Error())
-		return nil, err
-	}
-
-	resp, err := client.Do(req)
-
-	if err != nil {
-		fmt.Println(err.Error())
-		return nil, err
-	}
-
-	rawBody := resp.Body
-
-	defer rawBody.Close()
-
-	body, err := io.ReadAll(rawBody)
-
-	if err != nil {
-		fmt.Println(err.Error())
-		return nil, err
-	}
-
-	var tokenResp model.AccessTokenResponse
-
-	err = json.Unmarshal(body, &tokenResp)
-
-	if err != nil {
-		fmt.Println(err.Error())
-		return nil, err
-	}
-
-	return &tokenResp, nil
-}
-
-func (integration *RedditIntegration) buildGetWithHeaders(url string) (*http.Request, error) {
-	req, err := http.NewRequest("GET", url, nil)
-
-	if err != nil {
-		fmt.Println(err.Error())
-		return nil, err
-	}
-
-	integration.addDefaultHeaders(&req.Header)
-
-	return req, nil
-}
-
-func (integration *RedditIntegration) addDefaultHeaders(header *http.Header) {
-	value := fmt.Sprintf("bearer %s", integration.accessToken.Value)
-	header.Set("Authorization", value)
-	header.Set("Accept", contentType)
-
-	integration.addUserAgentHeader(header)
-}
-
-func (integration *RedditIntegration) buildOauth2Request() (*http.Request, error) {
+func (integration *RedditIntegration) buildOauth2Request(user, pass string) (*http.Request, error) {
 	url := redditMainHost + accessTokenPath
 
-	payload := bytes.NewBuffer([]byte(integration.buildOauth2PayloadWithPassword()))
+	payload := bytes.NewBuffer([]byte(buildOauth2PayloadWithPassword(user, pass)))
 
 	req, err := http.NewRequest("POST", url, payload)
 
@@ -199,25 +157,44 @@ func (integration *RedditIntegration) buildOauth2Request() (*http.Request, error
 	}
 
 	req.SetBasicAuth(integration.appId, integration.appToken)
-	integration.addUserAgentHeader(&req.Header)
+	addUserAgentHeader(&req.Header, user, integration.appId)
 
 	return req, nil
 }
 
-func (integration *RedditIntegration) addUserAgentHeader(header *http.Header) {
-	header.Set("User-Agent", integration.buildUserAgent())
+func buildOauth2PayloadWithPassword(user, pass string) string {
+	return fmt.Sprintf("grant_type=password&username=%s&password=%s", user, pass)
 }
 
-func (integration *RedditIntegration) buildOauth2PayloadWithPassword() string {
-	return fmt.Sprintf("grant_type=password&username=%s&password=%s", integration.user.UserName, integration.user.Password)
+func buildGetWithHeaders(url, user, appId, authorization string) (*http.Request, error) {
+	req, err := http.NewRequest("GET", url, nil)
+
+	if err != nil {
+		fmt.Println(err.Error())
+		return nil, err
+	}
+
+	addDefaultHeadersWithAuthentication(&req.Header, user, appId, authorization)
+
+	return req, nil
 }
 
-func (integration *RedditIntegration) buildUserAgent() string {
+func addDefaultHeadersWithAuthentication(header *http.Header, user, appId, authorization string) {
+	header.Set("Authorization", fmt.Sprintf("bearer %s", authorization))
+	header.Set("Accept", contentType)
+	addUserAgentHeader(header, user, appId)
+}
+
+func addUserAgentHeader(header *http.Header, user, appId string) {
+	header.Set("User-Agent", buildUserAgent(user, appId))
+}
+
+func buildUserAgent(user, appId string) string {
 	return fmt.Sprintf(
 		"%s:%s:%s (by /u/%s)",
 		userAgent,
-		integration.appId,
+		appId,
 		version,
-		integration.user,
+		user,
 	)
 }
