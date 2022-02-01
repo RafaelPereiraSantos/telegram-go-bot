@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
+	"telegram-go-bot/internal/application/model"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -15,13 +17,12 @@ type RedisIntegration struct {
 }
 
 const (
-	adminSuffix    = "_admin"
-	attemptsSuffix = "_attemps"
-	validateKey    = "true"
+	accessTokenSuffix = "_token"
+	attemptsSuffix    = "_attemps"
+	validateKey       = "true"
 )
 
-var adminExpirationTime = time.Minute * 10
-var attemptExpirationTime = time.Minute
+var attemptExpirationTime int64 = 60
 
 func NewRedisIntegration(address, password string, db int) (*RedisIntegration, error) {
 	rdb := redis.NewClient(&redis.Options{
@@ -40,30 +41,62 @@ func NewRedisIntegration(address, password string, db int) (*RedisIntegration, e
 	}, nil
 }
 
-func (db *RedisIntegration) SaveUserAsAdmin(account string) error {
-	fmt.Println(fmt.Sprintf("Saving user [%s] as admin", account))
-
-	err := db.setKeyValue(buildAdminKey(account), validateKey, adminExpirationTime)
+func (db *RedisIntegration) SaveAccessToken(accessToken *model.AccessToken, account string) error {
+	acccessTokeyKey := buildAccessTokenKey(account)
+	value, err := json.Marshal(&accessToken)
 
 	if err != nil {
-		fmt.Println(fmt.Sprintf("Not possible to save [%s] as admin due to [%s]", account, err.Error()))
+		fmt.Println(fmt.Sprintf("Not possible marshal access token due to %s", err.Error()))
 		return err
 	}
 
-	return nil
-}
-
-func (db *RedisIntegration) isAdminUser(account string) (bool, error) {
-	fmt.Println(fmt.Sprintf("Checking if [%s] is admin", account))
-
-	value, err := db.getValue(buildAdminKey(account))
+	err = db.setKeyValue(acccessTokeyKey, string(value), accessToken.ExpiresIn)
 
 	if err != nil {
-		fmt.Println(fmt.Sprintf("Not possible to check [%s] privileges due to [%s]", account, err.Error()))
-		return false, err
+		fmt.Println(fmt.Sprintf("Not possible to save access token due to %s", err.Error()))
 	}
 
-	return value == validateKey, nil
+	return err
+}
+
+func (db *RedisIntegration) RetrieveAccessToken(account string) (*model.AccessToken, error) {
+	acccessTokeyKey := buildAccessTokenKey(account)
+
+	value, err := db.getValue(acccessTokeyKey)
+
+	if err != nil {
+		fmt.Println(fmt.Sprintf("Not possible to retrieve access token due to %s", err.Error()))
+		return nil, err
+	}
+
+	var accessToken model.AccessToken
+	err = json.Unmarshal([]byte(value), &accessToken)
+
+	if err != nil {
+		fmt.Println(fmt.Sprintf("Not possible to unmarshal access token due to %s", err.Error()))
+		return nil, err
+	}
+
+	return &accessToken, nil
+}
+
+func (db *RedisIntegration) RetrieveUserLoginAttempt(account string) (int, error) {
+	accountKey := buildAttemptKey(account)
+
+	value, err := db.getValue(accountKey)
+
+	if err != nil {
+		fmt.Println(fmt.Sprintf("Not possible to retrieve [%s] attempt due to [%s]", account, err.Error()))
+	}
+
+	attemp, err := strconv.Atoi(value)
+
+	if err != nil {
+		fmt.Println(fmt.Sprintf("Attemp of [%s] bad format [%s]", account, err.Error()))
+		return 0, err
+	}
+
+	return attemp, nil
 }
 
 func (db *RedisIntegration) IncreaseUserLoginAttempt(account string) error {
@@ -112,9 +145,10 @@ func (db *RedisIntegration) ResetUserLoginAttemp(account string) error {
 	return err
 }
 
-func (db *RedisIntegration) setKeyValue(k, v string, expTime time.Duration) error {
+func (db *RedisIntegration) setKeyValue(k, v string, expTimeSeconds int64) error {
 	cli := db.client
-	err := cli.Set(db.context, k, v, expTime).Err()
+	expiration := time.Second * time.Duration(expTimeSeconds)
+	err := cli.Set(db.context, k, v, expiration).Err()
 	return err
 }
 
@@ -128,6 +162,6 @@ func buildAttemptKey(account string) string {
 	return account + attemptsSuffix
 }
 
-func buildAdminKey(account string) string {
-	return account + adminSuffix
+func buildAccessTokenKey(account string) string {
+	return account + accessTokenSuffix
 }
