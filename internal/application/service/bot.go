@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"telegram-go-bot/internal/application/port/out"
@@ -12,9 +13,10 @@ import (
 
 const (
 	helpCommand         = "/help"
-	updateCommand       = "/update"
+	updateCommand       = "/updates"
 	authenticateCommand = "/authenticateme"
-	helpText            = "I am a bot, you need to be logged to play with me type /login [user] [passscode]"
+	unloggedHelpText    = "I am a bot, you need to be logged to play with me type /authenticateme [user] [passscode]"
+	loggedHelpText      = "/help to get more information about commands.\n/updates to get updates from your social media.\n/authenticateme to authenticate, remember that a session last for only a hour."
 	genericErrorReply   = "Sorry, can't do that now"
 )
 
@@ -31,6 +33,7 @@ func NewBot(scraper out.SocialMediaScraper, userRepository out.UserRepository) *
 }
 
 func (bot *Bot) ReceiveMessage(message model.Message) string {
+	chatId := strconv.Itoa(int(message.ChatId))
 	user := message.User
 	content := message.Text
 
@@ -41,21 +44,21 @@ func (bot *Bot) ReceiveMessage(message model.Message) string {
 
 	switch cmd {
 	case helpCommand:
-		return helpText
+		return bot.replyWithHelp(chatId)
 	case authenticateCommand:
 		if len(params) < 2 {
 			return genericErrorReply
 		}
-		return bot.authorizeUserAndReply(params[0], params[1])
+		return bot.authorizeUserAndReply(chatId, params[0], params[1])
 	case updateCommand:
-		return bot.replyWithUserUpdates(user)
+		return bot.replyWithUserUpdates(chatId)
 	}
 
 	return "stop bothering me"
 }
 
-func (bot *Bot) authorizeUserAndReply(chatId, pass string) string {
-	_, err := bot.authorizeUserAndSaveToken(chatId, pass)
+func (bot *Bot) authorizeUserAndReply(chatId, user, pass string) string {
+	_, err := bot.authorizeUserAndSaveToken(chatId, user, pass)
 
 	if err != nil {
 		return genericErrorReply
@@ -64,8 +67,8 @@ func (bot *Bot) authorizeUserAndReply(chatId, pass string) string {
 	return "Good to see you back sir"
 }
 
-func (bot *Bot) authorizeUserAndSaveToken(chatId, pass string) (*model.AccessToken, error) {
-	accessToken, err := bot.scraper.RequestAccessToken(chatId, pass)
+func (bot *Bot) authorizeUserAndSaveToken(chatId, user, pass string) (*model.AccessToken, error) {
+	accessToken, err := bot.scraper.RequestAccessToken(user, pass)
 
 	if err != nil {
 		fmt.Printf("Not possible to authorize [%s]\n", chatId)
@@ -87,17 +90,28 @@ func (bot *Bot) replyWithUserUpdates(chatId string) string {
 	token, err := bot.retrieveUserAuthorization(chatId)
 
 	if err != nil {
-		fmt.Printf("Not possible to retrieve user [%s] updats\n", chatId)
+		fmt.Printf("Not possible to retrieve user [%s] authorization due to [%s]\n", chatId, err.Error())
 		return genericErrorReply
 	}
 
 	msg, err := bot.retrieveSocialMediaContent(*token)
 
 	if err != nil {
+		fmt.Printf("Not possible to retrieve user [%s] updates due to [%s]\n", chatId, err.Error())
 		return genericErrorReply
 	}
 
 	return msg
+}
+
+func (bot *Bot) replyWithHelp(chatId string) string {
+	token, err := bot.retrieveUserAuthorization(chatId)
+
+	if token == nil || err != nil {
+		return unloggedHelpText
+	}
+
+	return loggedHelpText
 }
 
 func (bot *Bot) retrieveUserAuthorization(chatId string) (*model.AccessToken, error) {

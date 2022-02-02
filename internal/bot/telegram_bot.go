@@ -45,7 +45,7 @@ func (tBot *TelegramBot) ListenEvents(debug bool) error {
 
 		receivedMessage := update.Message
 
-		log.Printf("[%s] %s", receivedMessage.From.UserName, receivedMessage.Text)
+		log.Printf("[%s] %s\n", receivedMessage.From.UserName, receivedMessage.Text)
 
 		replyText := srv.ReceiveMessage(
 			update.Message.Chat.ID,
