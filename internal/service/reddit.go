@@ -135,7 +135,7 @@ func (integration *RedditIntegration) FollowedPages(accessToken model.AccessToke
 
 func isAccessTokenValid(token model.AccessToken) bool {
 	expireAt := token.ExpiresIn + token.RequestedAt
-	currentTime := time.Now().UnixMicro()
+	currentTime := time.Now().Unix()
 
 	return currentTime < expireAt
 }
