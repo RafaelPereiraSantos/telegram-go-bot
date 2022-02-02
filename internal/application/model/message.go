@@ -1,6 +1,7 @@
 package model
 
 type Message struct {
-	User string
-	Text string
+	ChatId int64
+	User   string
+	Text   string
 }

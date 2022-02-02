@@ -1,13 +1,13 @@
 package in
 
 import (
-	"github.com/RafaelPereiraSantos/telegram-go-bot/internal/application/model"
-	"github.com/RafaelPereiraSantos/telegram-go-bot/internal/application/service"
+	"telegram-go-bot/internal/application/model"
+	"telegram-go-bot/internal/application/service"
 )
 
 type (
 	BotAdp interface {
-		ReceiveMessage(userName, message string) string
+		ReceiveMessage(chatId int64, userName, message string) string
 	}
 
 	BotImpl struct {
@@ -21,10 +21,11 @@ func NewBotImpl(srv *service.Bot) *BotImpl {
 	}
 }
 
-func (impl *BotImpl) ReceiveMessage(userName, message string) string {
+func (impl *BotImpl) ReceiveMessage(chatId int64, userName, message string) string {
 	msg := model.Message{
-		User: userName,
-		Text: message,
+		ChatId: chatId,
+		User:   userName,
+		Text:   message,
 	}
 
 	return impl.srv.ReceiveMessage(msg)

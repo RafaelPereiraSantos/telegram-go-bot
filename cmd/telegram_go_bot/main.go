@@ -6,12 +6,13 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"github.com/RafaelPereiraSantos/telegram-go-bot/internal/adapter/in"
-	apiOut "github.com/RafaelPereiraSantos/telegram-go-bot/internal/adapter/out/api"
-	"github.com/RafaelPereiraSantos/telegram-go-bot/internal/api"
-	"github.com/RafaelPereiraSantos/telegram-go-bot/internal/application/service"
-	"github.com/RafaelPereiraSantos/telegram-go-bot/internal/bot"
-	extService "github.com/RafaelPereiraSantos/telegram-go-bot/internal/service"
+	"telegram-go-bot/internal/adapter/in"
+	apiOut "telegram-go-bot/internal/adapter/out/api"
+	"telegram-go-bot/internal/adapter/out/repository"
+	"telegram-go-bot/internal/api"
+	"telegram-go-bot/internal/application/service"
+	"telegram-go-bot/internal/bot"
+	extService "telegram-go-bot/internal/service"
 )
 
 type healthResponse struct {
@@ -31,24 +32,32 @@ func main() {
 }
 
 func startBot() {
-	user := extService.RedditUser{
-		UserName: os.Getenv("REDDIT_USER_NAME"),
-		Password: os.Getenv("REDDIT_USER_PASSWORD"),
-	}
-
 	reddit := extService.NewRedditIntegration(
 		os.Getenv("REDDIT_APP_ID"),
 		os.Getenv("REDDIT_APP_TOKEN"),
-		user,
 	)
 	redditAdp := apiOut.NewReddtAdp(reddit)
 
-	botService := service.NewBot(redditAdp)
+	redis, err := extService.NewRedisIntegration(
+		os.Getenv("REDIS_ADDRESS"),
+		os.Getenv("REDIS_PASS"),
+		0,
+	)
+
+	if err != nil {
+		msg := fmt.Sprintf("Unable to connect with redis %s\n", err.Error())
+		fmt.Println(msg)
+		return
+	}
+
+	redisAdp := repository.NewRedisAdapter(redis)
+
+	botService := service.NewBot(redditAdp, redisAdp)
 	botServiceAdp := in.NewBotImpl(botService)
 
 	b, err := bot.NewTelegramBot(os.Getenv("TELEGRAM_SECRET_TOKEN"), botServiceAdp)
 	if err != nil {
-		msg := fmt.Sprintf("Unable to start bot %s", err.Error())
+		msg := fmt.Sprintf("Unable to start bot %s\n", err.Error())
 		fmt.Println(msg)
 		return
 	}

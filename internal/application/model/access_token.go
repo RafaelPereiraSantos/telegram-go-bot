@@ -9,8 +9,9 @@ type (
 	}
 
 	AccessToken struct {
-		Value       string
-		ExpiresIn   int64
-		RequestedAt int64
+		User        string `json:"user"`
+		Value       string `json:"value"`
+		ExpiresIn   int64  `json:"expires_in"`
+		RequestedAt int64  `json:"requested_at"`
 	}
 )

@@ -1,8 +1,8 @@
 package api
 
 import (
-	"github.com/RafaelPereiraSantos/telegram-go-bot/internal/application/model"
-	"github.com/RafaelPereiraSantos/telegram-go-bot/internal/service"
+	"telegram-go-bot/internal/application/model"
+	"telegram-go-bot/internal/service"
 )
 
 type RedditAdp struct {
@@ -15,6 +15,10 @@ func NewReddtAdp(redditIntegration *service.RedditIntegration) *RedditAdp {
 	}
 }
 
-func (adp *RedditAdp) FollowedPages() (*model.SubscriptionsResponse, error) {
-	return adp.redditIntegration.FollowedPages()
+func (adp *RedditAdp) RequestAccessToken(user, pass string) (*model.AccessToken, error) {
+	return adp.redditIntegration.RequestAccessToken(user, pass)
+}
+
+func (adp *RedditAdp) FollowedPages(accessToken model.AccessToken) (*model.SubscriptionsResponse, error) {
+	return adp.redditIntegration.FollowedPages(accessToken)
 }

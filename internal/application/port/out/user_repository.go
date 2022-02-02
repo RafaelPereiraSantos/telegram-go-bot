@@ -3,9 +3,9 @@ package out
 import "telegram-go-bot/internal/application/model"
 
 type UserRepository interface {
-	SaveAccessToken(accessToken *model.AccessToken, account string) error
-	RetrieveAccessToken(account string) (*model.AccessToken, error)
-	IncreaseUserLoginAttempt(account string) error
-	RetrieveUserLoginAttempt(account string) (int, error)
-	ResetUserLoginAttemp(account string) error
+	SaveAccessToken(accessToken *model.AccessToken, userId string) error
+	RetrieveAccessToken(userId string) (*model.AccessToken, error)
+	IncreaseUserLoginAttempt(userId string) error
+	RetrieveUserLoginAttempt(userId string) (int, error)
+	ResetUserLoginAttemp(userId string) error
 }

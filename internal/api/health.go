@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/RafaelPereiraSantos/telegram-go-bot/internal/application/port/in"
+	"telegram-go-bot/internal/application/port/in"
 )
 
 type (
@@ -21,14 +21,14 @@ func NewHealthApi(service in.HealthCheckUseCase) *HealthApi {
 }
 
 func (api *HealthApi) Start(port string) {
-	fmt.Printf("started server at :%s", port)
+	fmt.Printf("started server at :%s\n", port)
 
 	http.HandleFunc("/health", api.healthStatus)
 	http.ListenAndServe(":"+port, nil)
 }
 
 func (api *HealthApi) healthStatus(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("checking health...")
+	fmt.Printf("checking health...\n")
 
 	w.Header().Set("Content-Type", "application/json")
 

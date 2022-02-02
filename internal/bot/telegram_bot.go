@@ -3,7 +3,8 @@ package bot
 import (
 	"log"
 
-	"github.com/RafaelPereiraSantos/telegram-go-bot/internal/adapter/in"
+	"telegram-go-bot/internal/adapter/in"
+
 	telegramBot "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -42,12 +43,17 @@ func (tBot *TelegramBot) ListenEvents(debug bool) error {
 			continue
 		}
 
-		log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
-
 		receivedMessage := update.Message
-		replyText := srv.ReceiveMessage(receivedMessage.From.UserName, receivedMessage.Text)
 
-		msg := telegramBot.NewMessage(update.Message.Chat.ID, replyText)
+		log.Printf("[%s] %s", receivedMessage.From.UserName, receivedMessage.Text)
+
+		replyText := srv.ReceiveMessage(
+			update.Message.Chat.ID,
+			receivedMessage.From.UserName,
+			receivedMessage.Text,
+		)
+
+		msg := telegramBot.NewMessage(receivedMessage.Chat.ID, replyText)
 		// msg.ReplyToMessageID = update.Message.MessageID
 
 		bot.Send(msg)

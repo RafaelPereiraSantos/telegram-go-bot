@@ -37,11 +37,6 @@ func NewRedditIntegration(appId, appToken string) *RedditIntegration {
 	return &RedditIntegration{
 		appId:    appId,
 		appToken: appToken,
-		// accessToken: &model.AccessToken{
-		// 	Value:       "1502749964836-vucSBSsKxp65o669f4A3vEic-3WiPg",
-		// 	ExpiresIn:   3600,
-		// 	RequestedAt: 1643668961,
-		// },
 	}
 }
 
@@ -85,19 +80,20 @@ func (integration *RedditIntegration) RequestAccessToken(user, pass string) (*mo
 	}
 
 	return &model.AccessToken{
+		User:        user,
 		Value:       tokenResp.AccessToken,
 		ExpiresIn:   tokenResp.ExpiresIn,
 		RequestedAt: time.Now().Unix(),
 	}, nil
 }
 
-func (integration *RedditIntegration) FollowedPages(user string, accessToken model.AccessToken) (*model.SubscriptionsResponse, error) {
+func (integration *RedditIntegration) FollowedPages(accessToken model.AccessToken) (*model.SubscriptionsResponse, error) {
 	if !isAccessTokenValid(accessToken) {
 		return nil, ErrTokenExpired
 	}
 
 	url := redditOauthHost + mySubscriptionsPath
-	req, err := buildGetWithHeaders(url, user, integration.appId, accessToken.Value)
+	req, err := buildGetWithHeaders(url, accessToken.User, integration.appId, accessToken.Value)
 
 	if err != nil {
 		fmt.Println(err.Error())

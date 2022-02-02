@@ -1,6 +1,6 @@
 package in
 
-import "github.com/RafaelPereiraSantos/telegram-go-bot/internal/application/service"
+import "telegram-go-bot/internal/application/service"
 
 type (
 	HealthCheckAdp interface{}

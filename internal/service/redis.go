@@ -41,8 +41,8 @@ func NewRedisIntegration(address, password string, db int) (*RedisIntegration, e
 	}, nil
 }
 
-func (db *RedisIntegration) SaveAccessToken(accessToken *model.AccessToken, account string) error {
-	acccessTokeyKey := buildAccessTokenKey(account)
+func (db *RedisIntegration) SaveAccessToken(accessToken *model.AccessToken, userId string) error {
+	acccessTokeyKey := buildAccessTokenKey(userId)
 	value, err := json.Marshal(&accessToken)
 
 	if err != nil {
@@ -59,8 +59,8 @@ func (db *RedisIntegration) SaveAccessToken(accessToken *model.AccessToken, acco
 	return err
 }
 
-func (db *RedisIntegration) RetrieveAccessToken(account string) (*model.AccessToken, error) {
-	acccessTokeyKey := buildAccessTokenKey(account)
+func (db *RedisIntegration) RetrieveAccessToken(userId string) (*model.AccessToken, error) {
+	acccessTokeyKey := buildAccessTokenKey(userId)
 
 	value, err := db.getValue(acccessTokeyKey)
 
@@ -80,32 +80,32 @@ func (db *RedisIntegration) RetrieveAccessToken(account string) (*model.AccessTo
 	return &accessToken, nil
 }
 
-func (db *RedisIntegration) RetrieveUserLoginAttempt(account string) (int, error) {
-	accountKey := buildAttemptKey(account)
+func (db *RedisIntegration) RetrieveUserLoginAttempt(userId string) (int, error) {
+	key := buildAttemptKey(userId)
 
-	value, err := db.getValue(accountKey)
+	value, err := db.getValue(key)
 
 	if err != nil {
-		fmt.Println(fmt.Sprintf("Not possible to retrieve [%s] attempt due to [%s]", account, err.Error()))
+		fmt.Println(fmt.Sprintf("Not possible to retrieve [%s] attempt due to [%s]", userId, err.Error()))
 	}
 
 	attemp, err := strconv.Atoi(value)
 
 	if err != nil {
-		fmt.Println(fmt.Sprintf("Attemp of [%s] bad format [%s]", account, err.Error()))
+		fmt.Println(fmt.Sprintf("Attemp of [%s] bad format [%s]", userId, err.Error()))
 		return 0, err
 	}
 
 	return attemp, nil
 }
 
-func (db *RedisIntegration) IncreaseUserLoginAttempt(account string) error {
-	accountKey := buildAttemptKey(account)
+func (db *RedisIntegration) IncreaseUserLoginAttempt(userId string) error {
+	key := buildAttemptKey(userId)
 
-	currentAttempStr, err := db.getValue(accountKey)
+	currentAttempStr, err := db.getValue(key)
 
 	errorHandler := func(err error) {
-		fmt.Println(fmt.Sprintf("Not possible to save [%s] attempt due to [%s]", account, err.Error()))
+		fmt.Println(fmt.Sprintf("Not possible to save [%s] attempt due to [%s]", userId, err.Error()))
 	}
 
 	if err != nil {
@@ -113,7 +113,7 @@ func (db *RedisIntegration) IncreaseUserLoginAttempt(account string) error {
 			errorHandler(err)
 			return err
 		} else {
-			err := db.setKeyValue(accountKey, "1", attemptExpirationTime)
+			err := db.setKeyValue(key, "1", attemptExpirationTime)
 
 			if err != nil {
 				errorHandler(err)
@@ -127,7 +127,7 @@ func (db *RedisIntegration) IncreaseUserLoginAttempt(account string) error {
 	currentAttemp, _ := strconv.Atoi(currentAttempStr)
 	currentAttemp += 1
 
-	err = db.setKeyValue(accountKey, strconv.Itoa(currentAttemp), attemptExpirationTime)
+	err = db.setKeyValue(key, strconv.Itoa(currentAttemp), attemptExpirationTime)
 
 	if err != nil {
 		errorHandler(err)
@@ -137,10 +137,10 @@ func (db *RedisIntegration) IncreaseUserLoginAttempt(account string) error {
 	return nil
 }
 
-func (db *RedisIntegration) ResetUserLoginAttemp(account string) error {
-	err := db.client.Expire(db.context, buildAttemptKey(account), 0).Err()
+func (db *RedisIntegration) ResetUserLoginAttemp(userId string) error {
+	err := db.client.Expire(db.context, buildAttemptKey(userId), 0).Err()
 	if err != nil {
-		fmt.Println(fmt.Sprintf("Not possible to reset [%s] attempt due to [%s]", account, err.Error()))
+		fmt.Println(fmt.Sprintf("Not possible to reset [%s] attempt due to [%s]", userId, err.Error()))
 	}
 	return err
 }
@@ -158,10 +158,10 @@ func (db *RedisIntegration) getValue(k string) (string, error) {
 	return value, err
 }
 
-func buildAttemptKey(account string) string {
-	return account + attemptsSuffix
+func buildAttemptKey(userId string) string {
+	return userId + attemptsSuffix
 }
 
-func buildAccessTokenKey(account string) string {
-	return account + accessTokenSuffix
+func buildAccessTokenKey(userId string) string {
+	return userId + accessTokenSuffix
 }
