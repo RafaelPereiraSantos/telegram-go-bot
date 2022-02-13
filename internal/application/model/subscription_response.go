@@ -16,6 +16,7 @@ type (
 	}
 
 	SubscriptionsChildrenDateResponse struct {
-		DispalyName string `json:"display_name"`
+		DispalyName         string `json:"display_name"`
+		DispalyNamePrefixed string `json:"display_name_prefixed"`
 	}
 )

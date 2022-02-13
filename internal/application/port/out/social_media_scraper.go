@@ -4,5 +4,6 @@ import "telegram-go-bot/internal/application/model"
 
 type SocialMediaScraper interface {
 	RequestAccessToken(user, pass string) (*model.AccessToken, error)
-	FollowedPages(accessToken model.AccessToken) (*model.SubscriptionsResponse, error)
+	FollowedUsers(accessToken model.AccessToken) ([]model.User, error)
+	PostsFromUser(accessToken model.AccessToken, pageName string) ([]model.UserPost, error)
 }

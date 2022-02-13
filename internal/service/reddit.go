@@ -20,13 +20,11 @@ type (
 )
 
 const (
-	userAgent           = "golang-bot"
-	version             = "0.0.1"
-	redditMainHost      = "https://www.reddit.com"
-	redditOauthHost     = "https://oauth.reddit.com"
-	accessTokenPath     = "/api/v1/access_token"
-	mySubscriptionsPath = "/subreddits/mine/subscriber"
-	contentType         = "application/json"
+	userAgent       = "golang-bot"
+	version         = "0.0.1"
+	contentType     = "application/json"
+	redditMainHost  = "https://www.reddit.com"
+	redditOauthHost = "https://oauth.reddit.com"
 )
 
 var (
@@ -92,6 +90,7 @@ func (integration *RedditIntegration) FollowedPages(accessToken model.AccessToke
 		return nil, ErrTokenExpired
 	}
 
+	mySubscriptionsPath := "/subreddits/mine/subscriber"
 	url := redditOauthHost + mySubscriptionsPath
 	req, err := buildGetWithHeaders(url, accessToken.User, integration.appId, accessToken.Value)
 
@@ -140,7 +139,59 @@ func isAccessTokenValid(token model.AccessToken) bool {
 	return currentTime < expireAt
 }
 
+func (integration *RedditIntegration) PostsFromPage(accessToken model.AccessToken, pageName string) (*model.PostResponse, error) {
+	if !isAccessTokenValid(accessToken) {
+		return nil, ErrTokenExpired
+	}
+
+	pageCommentsPath := buildPageCommentsPath(pageName)
+	url := redditOauthHost + pageCommentsPath
+	req, err := buildGetWithHeaders(url, accessToken.User, integration.appId, accessToken.Value)
+
+	if err != nil {
+		fmt.Println(err.Error())
+		return nil, err
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+
+	if err != nil {
+		fmt.Println(err.Error())
+		return nil, err
+	}
+
+	rawBody := resp.Body
+
+	defer rawBody.Close()
+
+	body, err := io.ReadAll(rawBody)
+
+	if err != nil {
+		fmt.Println(err.Error())
+		return nil, err
+	}
+
+	var postResp model.PostResponse
+
+	err = json.Unmarshal(body, &postResp)
+
+	fmt.Println(postResp)
+
+	if err != nil {
+		fmt.Println(err.Error())
+		return nil, err
+	}
+
+	return &postResp, nil
+}
+
+func buildPageCommentsPath(page string) string {
+	return fmt.Sprintf("/user/%s/comments", page)
+}
+
 func (integration *RedditIntegration) buildOauth2Request(user, pass string) (*http.Request, error) {
+	accessTokenPath := "/api/v1/access_token"
 	url := redditMainHost + accessTokenPath
 
 	payload := bytes.NewBuffer([]byte(buildOauth2PayloadWithPassword(user, pass)))

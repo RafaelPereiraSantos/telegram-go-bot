@@ -54,6 +54,8 @@ func (tBot *TelegramBot) ListenEvents(debug bool) error {
 		)
 
 		msg := telegramBot.NewMessage(receivedMessage.Chat.ID, replyText)
+		// a := telegramBot.NewPhoto()
+		// a.Caption = ""
 		// msg.ReplyToMessageID = update.Message.MessageID
 
 		bot.Send(msg)
