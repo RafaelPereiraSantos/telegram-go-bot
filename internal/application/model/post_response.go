@@ -14,6 +14,7 @@ type (
 	}
 
 	PostResponseDataChildrenData struct {
-		Title string `json:"link_title"`
+		Title   string `json:"link_title"`
+		LinkUrl string `json:"link_url"`
 	}
 )

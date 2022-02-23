@@ -58,9 +58,14 @@ func (adp *RedditAdp) PostsFromUser(accessToken model.AccessToken, pageName stri
 	posts := make([]model.UserPost, 0, len(postResponse.Data.Children)+1)
 
 	for _, child := range postResponse.Data.Children {
-		posts = append(posts, model.UserPost{
-			Title: child.Data.Title,
-		})
+		data := child.Data
+		post := model.UserPost{
+			Title: data.Title,
+			Image: model.PostImage{
+				Url: data.LinkUrl,
+			},
+		}
+		posts = append(posts, post)
 	}
 
 	return posts, nil

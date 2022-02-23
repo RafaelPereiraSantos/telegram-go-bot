@@ -3,17 +3,18 @@ package bot
 import (
 	"log"
 
-	"telegram-go-bot/internal/adapter/in"
+	"telegram-go-bot/internal/application/model"
+	portIn "telegram-go-bot/internal/application/port/in"
 
 	telegramBot "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 type TelegramBot struct {
 	bot           *telegramBot.BotAPI
-	messageSevice in.BotAdp
+	messageSevice portIn.BotUseCase
 }
 
-func NewTelegramBot(telegramToken string, messageSevice in.BotAdp) (*TelegramBot, error) {
+func NewTelegramBot(telegramToken string, messageSevice portIn.BotUseCase) (*TelegramBot, error) {
 	bot, err := telegramBot.NewBotAPI(telegramToken)
 
 	if err != nil {
@@ -47,18 +48,24 @@ func (tBot *TelegramBot) ListenEvents(debug bool) error {
 
 		log.Printf("[%s] %s\n", receivedMessage.From.UserName, receivedMessage.Text)
 
-		replyText := srv.ReceiveMessage(
-			update.Message.Chat.ID,
-			receivedMessage.From.UserName,
-			receivedMessage.Text,
-		)
+		received := model.ReceivedMessage{
+			ChatId: update.Message.Chat.ID,
+			User:   receivedMessage.From.UserName,
+			Text:   receivedMessage.Text,
+		}
 
-		msg := telegramBot.NewMessage(receivedMessage.Chat.ID, replyText)
-		// a := telegramBot.NewPhoto()
-		// a.Caption = ""
-		// msg.ReplyToMessageID = update.Message.MessageID
+		replyMessages := srv.ReceiveMessage(received)
 
-		bot.Send(msg)
+		chatID := receivedMessage.Chat.ID
+		for _, reply := range replyMessages {
+			if reply.Image == nil {
+				bot.Send(telegramBot.NewMessage(chatID, reply.Text))
+			} else {
+				msg := telegramBot.NewPhoto(chatID, reply.Image)
+				msg.Caption = reply.Text
+				bot.Send(msg)
+			}
+		}
 	}
 
 	return nil

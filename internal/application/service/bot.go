@@ -3,22 +3,30 @@ package service
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
 	"telegram-go-bot/internal/application/port/out"
 
 	"telegram-go-bot/internal/application/model"
+
+	"github.com/google/uuid"
 )
 
 const (
+	tempFolder          = "temp"
 	helpCommand         = "/help"
 	updateCommand       = "/updates"
 	authenticateCommand = "/authenticateme"
 	userPosts           = "/postsfrom"
 	unloggedHelpText    = "I am a bot, you need to be logged to play with me type /authenticateme [user] [passscode]"
 	loggedHelpText      = "/help to get more information about commands.\n/updates to get updates from your social media.\n/authenticateme to authenticate, remember that a session last for only a hour.\n/postsfrom to get posts from a user."
-	genericErrorReply   = "Sorry, can't do that now"
+	genericReply        = "I am not so sure about what I should do."
+	genericErrorReply   = "I think something went wrong"
+	genericSuccessReply = "Ok"
 )
 
 type Bot struct {
@@ -33,7 +41,7 @@ func NewBot(scraper out.SocialMediaScraper, userRepository out.UserRepository) *
 	}
 }
 
-func (bot *Bot) ReceiveMessage(message model.Message) string {
+func (bot *Bot) ReceiveMessage(message model.ReceivedMessage) []model.ReplyMessage {
 	chatId := strconv.Itoa(int(message.ChatId))
 	user := message.User
 	content := message.Text
@@ -43,28 +51,64 @@ func (bot *Bot) ReceiveMessage(message model.Message) string {
 
 	cmd, params := stripCommandAndParams(content)
 
+	reply := make([]model.ReplyMessage, 0)
+
 	switch cmd {
 	case helpCommand:
-		return bot.replyWithHelp(chatId)
+		reply = append(reply, model.ReplyMessage{
+			Text: bot.helpText(chatId),
+		})
 	case authenticateCommand:
-		if len(params) < 2 {
-			return genericErrorReply
+		if len(params) >= 2 {
+			err := bot.authorizeAndSaveUserCredentialLocally(chatId, params[0], params[1])
+
+			msg := genericSuccessReply
+			if err != nil {
+				msg = genericErrorReply
+			}
+
+			reply = append(reply, model.ReplyMessage{
+				Text: msg,
+			})
 		}
-		return bot.authorizeUserAndReply(chatId, params[0], params[1])
 	case updateCommand:
-		return bot.replyWithListOfFollowedUsers(chatId)
+		reply = append(reply, model.ReplyMessage{
+			Text: bot.listOfUsersAsSingleText(chatId),
+		})
 	case userPosts:
-		if len(params) < 1 {
-			return genericErrorReply
+		if len(params) >= 1 {
+			userPosts, err := bot.checkAuthorizationAndRetrievePostsFromUser(chatId, params[0])
+			if err != nil {
+				for _, p := range userPosts {
+					filePath, err := downloadFile(p.Image.Url)
+
+					if err != nil {
+						fmt.Println(
+							fmt.Sprintf("Impossible to download file [%s] [%v]", p.Image.Url, err),
+						)
+					}
+					reply = append(reply, model.ReplyMessage{
+						Image: &model.ReplyLocalImage{
+							FileName: uuid.NewString(),
+							FilePath: filePath,
+						},
+					})
+				}
+			}
 		}
-		return bot.replyWithUserPosts(chatId, params[0])
 	}
 
-	return "stop bothering me"
+	if len(reply) == 0 {
+		reply = append(reply, model.ReplyMessage{
+			Text: genericReply,
+		})
+	}
+
+	return reply
 }
 
-func (bot *Bot) replyWithHelp(chatId string) string {
-	token, err := bot.retrieveUserAuthorization(chatId)
+func (bot *Bot) helpText(chatId string) string {
+	token, err := bot.retrieveUserAuthorizationFromLocal(chatId)
 
 	if token == nil || err != nil {
 		return unloggedHelpText
@@ -73,53 +117,60 @@ func (bot *Bot) replyWithHelp(chatId string) string {
 	return loggedHelpText
 }
 
-func (bot *Bot) authorizeUserAndReply(chatId, user, pass string) string {
-	_, err := bot.authorizeUserAndSaveToken(chatId, user, pass)
+func (bot *Bot) authorizeAndSaveUserCredentialLocally(chatId, user, pass string) error {
+	accessToken, err := bot.retrieveUserAuthorizationFromRemote(chatId, user, pass)
 
 	if err != nil {
-		return genericErrorReply
+		return err
 	}
 
-	return "Good to see you back sir"
+	err = bot.userRepository.SaveAccessToken(accessToken, chatId)
+
+	if err != nil {
+		fmt.Printf("Not possible to save user authorization [%s]\n", chatId)
+		return err
+	}
+
+	return err
 }
 
-func (bot *Bot) replyWithListOfFollowedUsers(chatId string) string {
-	token, err := bot.retrieveUserAuthorization(chatId)
+func (bot *Bot) listOfUsersAsSingleText(chatId string) string {
+	token, err := bot.retrieveUserAuthorizationFromLocal(chatId)
 
 	if err != nil {
 		fmt.Printf("Not possible to retrieve user [%s] authorization due to [%s]\n", chatId, err.Error())
-		return genericErrorReply
+		return genericReply
 	}
 
 	msg, err := bot.retrieveListOfFollowedUsers(*token)
 
 	if err != nil {
 		fmt.Printf("Not possible to retrieve user [%s] updates due to [%s]\n", chatId, err.Error())
-		return genericErrorReply
+		return genericReply
 	}
 
 	return msg
 }
 
-func (bot *Bot) replyWithUserPosts(chatId, user string) string {
-	token, err := bot.retrieveUserAuthorization(chatId)
+func (bot *Bot) checkAuthorizationAndRetrievePostsFromUser(chatId, user string) ([]model.UserPost, error) {
+	token, err := bot.retrieveUserAuthorizationFromLocal(chatId)
 
 	if err != nil {
 		fmt.Printf("Not possible to retrieve user [%s] authorization due to [%s]\n", chatId, err.Error())
-		return genericErrorReply
+		return nil, err
 	}
 
 	msg, err := bot.retrievePostsFromUser(*token, user)
 
 	if err != nil {
-		fmt.Printf("Not possible to retrieve user [%s] updates due to [%s]\n", chatId, err.Error())
-		return genericErrorReply
+		fmt.Printf("Not possible to retrieve [%s]'s posts due to [%s]\n", chatId, err.Error())
+		return nil, err
 	}
 
-	return msg
+	return msg, nil
 }
 
-func (bot *Bot) retrieveUserAuthorization(chatId string) (*model.AccessToken, error) {
+func (bot *Bot) retrieveUserAuthorizationFromLocal(chatId string) (*model.AccessToken, error) {
 	accesToken, err := bot.userRepository.RetrieveAccessToken(chatId)
 
 	if err != nil {
@@ -130,18 +181,11 @@ func (bot *Bot) retrieveUserAuthorization(chatId string) (*model.AccessToken, er
 	return accesToken, nil
 }
 
-func (bot *Bot) authorizeUserAndSaveToken(chatId, user, pass string) (*model.AccessToken, error) {
+func (bot *Bot) retrieveUserAuthorizationFromRemote(chatId, user, pass string) (*model.AccessToken, error) {
 	accessToken, err := bot.scraper.RequestAccessToken(user, pass)
 
 	if err != nil {
 		fmt.Printf("Not possible to authorize [%s]\n", chatId)
-		return nil, err
-	}
-
-	err = bot.userRepository.SaveAccessToken(accessToken, chatId)
-
-	if err != nil {
-		fmt.Printf("Not possible to save user authorization [%s]\n", chatId)
 		return nil, err
 	}
 
@@ -167,23 +211,16 @@ func (bot *Bot) retrieveListOfFollowedUsers(accessToken model.AccessToken) (stri
 	return msgBuffer.String(), nil
 }
 
-func (bot *Bot) retrievePostsFromUser(accessToken model.AccessToken, userName string) (string, error) {
+func (bot *Bot) retrievePostsFromUser(accessToken model.AccessToken, userName string) ([]model.UserPost, error) {
 	scraper := bot.scraper
 
 	posts, err := scraper.PostsFromUser(accessToken, userName)
 
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	var msgBuffer bytes.Buffer
-
-	for _, p := range posts {
-		msgBuffer.WriteString(p.Title)
-		msgBuffer.WriteString("\n")
-	}
-
-	return msgBuffer.String(), nil
+	return posts, nil
 }
 
 func stripCommandAndParams(message string) (string, []string) {
@@ -201,4 +238,28 @@ func stripCommandAndParams(message string) (string, []string) {
 	}
 
 	return cmd, words[1:size]
+}
+
+func downloadFile(url string) (string, error) {
+	fileName := tempFolder + "/" + uuid.NewString() + ".png"
+	f, err := os.Create(fileName)
+	defer f.Close()
+
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := http.Get(url)
+
+	if err != nil {
+		return "", err
+	}
+
+	_, err = io.Copy(f, resp.Body)
+
+	if err != nil {
+		return "", err
+	}
+
+	return fileName, nil
 }

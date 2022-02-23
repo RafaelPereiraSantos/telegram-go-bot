@@ -21,12 +21,6 @@ func NewBotImpl(srv *service.Bot) *BotImpl {
 	}
 }
 
-func (impl *BotImpl) ReceiveMessage(chatId int64, userName, message string) string {
-	msg := model.Message{
-		ChatId: chatId,
-		User:   userName,
-		Text:   message,
-	}
-
+func (impl *BotImpl) ReceiveMessage(msg model.ReceivedMessage) []model.ReplyMessage {
 	return impl.srv.ReceiveMessage(msg)
 }

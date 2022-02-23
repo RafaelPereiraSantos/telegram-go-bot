@@ -7,5 +7,10 @@ type (
 
 	UserPost struct {
 		Title string
+		Image PostImage
+	}
+
+	PostImage struct {
+		Url string
 	}
 )
