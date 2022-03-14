@@ -21,3 +21,6 @@ go run cmd/telegram_go_bot/main.go
 docker build -t my-telegram-bot .
 docker run -e TELEGRAM_SECRET_TOKEN="${my-secret-key}" -e PORT=8080 my-telegram-bot
 ```
+
+### Kindly Warning
+**I am not an expert on security or best practices on the subject and since this bot handle credentials, use it at your own risk.**
