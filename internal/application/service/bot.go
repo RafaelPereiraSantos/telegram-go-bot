@@ -3,17 +3,13 @@ package service
 import (
 	"bytes"
 	"fmt"
-	"io"
-	"net/http"
-	"os"
 	"strconv"
 	"strings"
 
 	"telegram-go-bot/internal/application/port/out"
+	"telegram-go-bot/internal/utils/ziputils"
 
 	"telegram-go-bot/internal/application/model"
-
-	"github.com/google/uuid"
 )
 
 const (
@@ -78,22 +74,33 @@ func (bot *Bot) ReceiveMessage(message model.ReceivedMessage) []model.ReplyMessa
 	case userPosts:
 		if len(params) >= 1 {
 			userPosts, err := bot.checkAuthorizationAndRetrievePostsFromUser(chatId, params[0])
-			if err != nil {
-				for _, p := range userPosts {
-					filePath, err := downloadFile(p.Image.Url)
-
-					if err != nil {
-						fmt.Println(
-							fmt.Sprintf("Impossible to download file [%s] [%v]", p.Image.Url, err),
-						)
+			if err == nil {
+				urls := make([]string, 0, len(userPosts)+1)
+				for i, p := range userPosts {
+					if i > 3 {
+						break
 					}
+					urls = append(urls, p.Image.Url)
+				}
+
+				zipFileName, err := ziputils.DownloadFilesAndCompress(urls)
+
+				if err != nil {
+					msg := fmt.Sprintf("Unable to compress files due to [%v]", err)
+					fmt.Println(msg)
+
+					reply = append(reply, model.ReplyMessage{
+						Text: genericErrorReply,
+					})
+				} else {
 					reply = append(reply, model.ReplyMessage{
 						Image: &model.ReplyLocalImage{
-							FileName: uuid.NewString(),
-							FilePath: filePath,
+							FileName: zipFileName,
+							FilePath: zipFileName,
 						},
 					})
 				}
+
 			}
 		}
 	}
@@ -238,28 +245,4 @@ func stripCommandAndParams(message string) (string, []string) {
 	}
 
 	return cmd, words[1:size]
-}
-
-func downloadFile(url string) (string, error) {
-	fileName := tempFolder + "/" + uuid.NewString() + ".png"
-	f, err := os.Create(fileName)
-	defer f.Close()
-
-	if err != nil {
-		return "", err
-	}
-
-	resp, err := http.Get(url)
-
-	if err != nil {
-		return "", err
-	}
-
-	_, err = io.Copy(f, resp.Body)
-
-	if err != nil {
-		return "", err
-	}
-
-	return fileName, nil
 }

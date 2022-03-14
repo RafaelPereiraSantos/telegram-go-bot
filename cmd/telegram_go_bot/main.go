@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -45,9 +46,7 @@ func startBot() {
 	)
 
 	if err != nil {
-		msg := fmt.Sprintf("Unable to connect with redis %s\n", err.Error())
-		fmt.Println(msg)
-		return
+		log.Fatalf("Unable to connect with redis %s\n", err.Error())
 	}
 
 	redisAdp := repository.NewRedisAdapter(redis)
@@ -57,9 +56,7 @@ func startBot() {
 
 	b, err := bot.NewTelegramBot(os.Getenv("TELEGRAM_SECRET_TOKEN"), botServiceAdp)
 	if err != nil {
-		msg := fmt.Sprintf("Unable to start bot %s\n", err.Error())
-		fmt.Println(msg)
-		return
+		log.Fatalf("Unable to start bot %s\n", err.Error())
 	}
 
 	b.ListenEvents(true)

@@ -20,11 +20,13 @@ type (
 )
 
 const (
-	userAgent       = "golang-bot"
-	version         = "0.0.1"
-	contentType     = "application/json"
-	redditMainHost  = "https://www.reddit.com"
-	redditOauthHost = "https://oauth.reddit.com"
+	userAgent           = "golang-bot"
+	version             = "0.0.1"
+	contentType         = "application/json"
+	redditMainHost      = "https://www.reddit.com"
+	redditOauthHost     = "https://oauth.reddit.com"
+	mySubscriptionsPath = "/subreddits/mine/subscriber"
+	accessTokenPath     = "/api/v1/access_token"
 )
 
 var (
@@ -90,7 +92,6 @@ func (integration *RedditIntegration) FollowedPages(accessToken model.AccessToke
 		return nil, ErrTokenExpired
 	}
 
-	mySubscriptionsPath := "/subreddits/mine/subscriber"
 	url := redditOauthHost + mySubscriptionsPath
 	req, err := buildGetWithHeaders(url, accessToken.User, integration.appId, accessToken.Value)
 
@@ -144,7 +145,7 @@ func (integration *RedditIntegration) PostsFromPage(accessToken model.AccessToke
 		return nil, ErrTokenExpired
 	}
 
-	pageCommentsPath := buildPageCommentsPath(pageName)
+	pageCommentsPath := buildUserCommentsPath(pageName)
 	url := redditOauthHost + pageCommentsPath
 	req, err := buildGetWithHeaders(url, accessToken.User, integration.appId, accessToken.Value)
 
@@ -186,12 +187,11 @@ func (integration *RedditIntegration) PostsFromPage(accessToken model.AccessToke
 	return &postResp, nil
 }
 
-func buildPageCommentsPath(page string) string {
+func buildUserCommentsPath(page string) string {
 	return fmt.Sprintf("/user/%s/comments", page)
 }
 
 func (integration *RedditIntegration) buildOauth2Request(user, pass string) (*http.Request, error) {
-	accessTokenPath := "/api/v1/access_token"
 	url := redditMainHost + accessTokenPath
 
 	payload := bytes.NewBuffer([]byte(buildOauth2PayloadWithPassword(user, pass)))

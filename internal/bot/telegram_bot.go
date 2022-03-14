@@ -61,7 +61,7 @@ func (tBot *TelegramBot) ListenEvents(debug bool) error {
 			if reply.Image == nil {
 				bot.Send(telegramBot.NewMessage(chatID, reply.Text))
 			} else {
-				msg := telegramBot.NewPhoto(chatID, reply.Image)
+				msg := telegramBot.NewDocument(chatID, reply.Image)
 				msg.Caption = reply.Text
 				bot.Send(msg)
 			}

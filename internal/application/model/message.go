@@ -44,5 +44,5 @@ func (ri *ReplyLocalImage) SendData() string {
 }
 
 func (ri ReplyLocalImage) removeUploadedFile() error {
-	return os.Remove(ri.FilePath)
+	return nil
 }
