@@ -27,6 +27,7 @@ func NewTelegramBot(telegramToken string, messageSevice portIn.BotUseCase) (*Tel
 	}, nil
 }
 
+// ListenEvents, it starts the event listener of the telegram bot api.
 func (tBot *TelegramBot) ListenEvents(debug bool) error {
 
 	bot := tBot.bot

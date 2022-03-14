@@ -37,6 +37,8 @@ func NewBot(scraper out.SocialMediaScraper, userRepository out.UserRepository) *
 	}
 }
 
+// ReceiveMessage, it receives the bot messages and decides what to do with it based on the command
+// that was passed by the users.
 func (bot *Bot) ReceiveMessage(message model.ReceivedMessage) []model.ReplyMessage {
 	chatId := strconv.Itoa(int(message.ChatId))
 	user := message.User
@@ -124,6 +126,9 @@ func (bot *Bot) helpText(chatId string) string {
 	return loggedHelpText
 }
 
+// authorizeAndSaveUserCredentialLocally, it tries to retrieve user's credentials from the social media and saves them
+// localy in a repository in order to avoid unecessary requests to the server and unecessary new credentials being
+// passed every time the user interacts with the bot.
 func (bot *Bot) authorizeAndSaveUserCredentialLocally(chatId, user, pass string) error {
 	accessToken, err := bot.retrieveUserAuthorizationFromRemote(chatId, user, pass)
 
@@ -177,6 +182,8 @@ func (bot *Bot) checkAuthorizationAndRetrievePostsFromUser(chatId, user string) 
 	return msg, nil
 }
 
+// retrieveUserAuthorizationFromLocal, it tries to retrive the previous credentials of the users if they do exist to
+// avoid contacting the social media server to retrieve new ones unecessary.
 func (bot *Bot) retrieveUserAuthorizationFromLocal(chatId string) (*model.AccessToken, error) {
 	accesToken, err := bot.userRepository.RetrieveAccessToken(chatId)
 
@@ -230,6 +237,8 @@ func (bot *Bot) retrievePostsFromUser(accessToken model.AccessToken, userName st
 	return posts, nil
 }
 
+// stripCommandAndParams, the bot only accepts commands by now so, every message from the users must be a command, a
+// text with a slash at the start followed by parameters ex. /authenticateme user credentials
 func stripCommandAndParams(message string) (string, []string) {
 	words := strings.Split(message, " ")
 	size := len(words)
